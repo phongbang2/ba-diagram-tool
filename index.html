@@ -2,12 +2,11 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>BA Flow Generator – Stable Version</title>
+<title>BA Flow Generator – V4 Ultra Stable</title>
 
+<!-- Mermaid -->
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-<script>
-    mermaid.initialize({ startOnLoad: false });
-</script>
+<script>mermaid.initialize({ startOnLoad: false });</script>
 
 <style>
 body { font-family: Arial; margin: 20px; background: #f5f5f5; }
@@ -19,7 +18,7 @@ button { padding: 10px; margin: 8px; background: #0066ff; color: #fff; border: n
 
 <body>
 
-<h1>BA Flow Generator – STABLE VERSION (Không bỏ sót dòng)</h1>
+<h1>BA Flow Generator – V4 (Fix Word / Long Text / Auto Split)</h1>
 
 <textarea id="usinput" placeholder="Paste User Story vào đây..."></textarea>
 <button onclick="convertUS()">Convert</button>
@@ -31,23 +30,32 @@ button { padding: 10px; margin: 8px; background: #0066ff; color: #fff; border: n
 <div id="diagram"></div>
 
 <script>
-// CLEAN TEXT: remove only truly dangerous chars
-function clean(text) {
-    return text
-        .replace(/[{}[\]]/g, "")     // Remove mermaid-breaking chars
-        .replace(/[*#]/g, "")        // Remove bullets
-        .replace(/–/g, "-")          // normalize unicode dash
-        .replace(/\s+/g, " ")        // collapse spaces
-        .trim();
+// RULE: Tách dòng mạnh
+function smartSplit(raw) {
+    return raw
+        // Normalize bullets
+        .replace(/[\u2022•\-–]/g, "\n")
+        // Split periods
+        .replace(/\.\s+/g, "\n")
+        // Split semicolons
+        .replace(/;\s+/g, "\n")
+        // Split colon after key phrases
+        .replace(/:(?=[A-Za-z])/g, ":\n")
+        // Hard split BA keywords
+        .replace(/\b(If|Else|Nếυ|Ngược lại|Requirement|Batch|Enhance|Status|Release|KID|MA )\b/gi, "\n$1")
+        // Convert multiple spaces to newlines
+        .replace(/ {4,}/g, "\n")
+        .split("\n")
+        .map(x => x.trim())
+        .filter(x => x.length > 2);
 }
 
-// Split docx → real lines
-function normalizeLines(raw) {
-    return raw
-        .split("\n")
-        .flatMap(line => line.split(/•|–|- /))  // split bullets
-        .map(l => clean(l))
-        .filter(l => l.length > 0);
+// Clean for Mermaid
+function safe(text) {
+    return text
+        .replace(/[{}[\]]/g, "")
+        .replace(/[#*]/g, "")
+        .trim();
 }
 
 function isIF(line) { return /(if|nếu|when|trường hợp)/i.test(line); }
@@ -55,25 +63,24 @@ function isELSE(line) { return /(else|ngược lại|otherwise|không thì)/i.te
 
 function convertUS() {
     let raw = document.getElementById("usinput").value;
-    let lines = normalizeLines(raw);
+    let lines = smartSplit(raw).map(safe);
+
+    console.log("DEBUG LINES:", lines);
 
     if (lines.length === 0) {
-        document.getElementById("mermaidoutput").value = "flowchart TD\n    A[Không tìm thấy dòng hợp lệ]";
+        document.getElementById("mermaidoutput").value =
+            "flowchart TD\nA[Không tách được dòng nào]";
         return;
     }
 
-    let nodes = [];
-    let edges = [];
+    let nodes = [], edges = [];
     let stack = [];
     let last = null;
 
-    lines.forEach((line, idx) => {
-        let id = "N" + (idx + 1);
-
+    lines.forEach((line, i) => {
+        let id = "N" + (i + 1);
         let node = isIF(line)
             ? `${id}{${line}}`
-            : isELSE(line)
-            ? `${id}[${line}]`
             : `${id}[${line}]`;
 
         nodes.push(node);
@@ -86,10 +93,8 @@ function convertUS() {
         }
 
         if (isELSE(line)) {
-            if (stack.length > 0) {
-                let parent = stack[stack.length - 1];
-                edges.push(`${parent} -->|No| ${id}`);
-            }
+            let parent = stack[stack.length - 1];
+            edges.push(`${parent} -->|No| ${id}`);
             last = id;
             return;
         }
@@ -104,10 +109,8 @@ function convertUS() {
         last = id;
     });
 
-    let out = "flowchart TD\n    " +
-        nodes.join("\n    ") +
-        "\n\n    " +
-        edges.join("\n    ");
+    let out = "flowchart TD\n    " + nodes.join("\n    ") +
+              "\n\n    " + edges.join("\n    ");
 
     document.getElementById("mermaidoutput").value = out;
 }
@@ -115,7 +118,7 @@ function convertUS() {
 function renderDiagram() {
     let code = document.getElementById("mermaidoutput").value;
     document.getElementById("diagram").innerHTML =
-        `<div class="mermaid">${code}</div>`;
+        `<div class='mermaid'>${code}</div>`;
     mermaid.init();
 }
 </script>
