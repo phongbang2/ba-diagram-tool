@@ -2,105 +2,188 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>BA Flow Generator (IF/ELSE Auto Branch)</title>
+<title>BA Flow Generator PRO (Nested IF/ELSE + Node Types + Insurance Rules)</title>
 
 <!-- Mermaid -->
-https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 <script>
     mermaid.initialize({ startOnLoad: false });
 </script>
 
 <style>
-body { font-family: Arial; margin: 20px; background: #f5f5f5; }
+body {
+    font-family: Arial;
+    margin: 20px;
+    background: #f5f5f5;
+}
 textarea {
-    width: 100%; height: 200px; padding: 12px; font-size: 14px;
-    border-radius: 6px; border: 1px solid #ccc;
+    width: 100%;
+    height: 200px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
 }
 button {
-    padding: 10px 18px; margin: 10px 5px 20px 0;
-    background: #0066ff; color: white; border: none;
-    border-radius: 6px; cursor: pointer;
+    padding: 10px 18px;
+    margin: 10px 5px 20px 0;
+    background: #0066ff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
 }
 #diagram {
-    background: white; padding: 20px; margin-top: 25px;
-    border-radius: 8px;
+    background: white;
+    padding: 20px;
+    margin-top: 25px;
+    border-radius: 10px;
 }
+h1 { margin-bottom: 15px; font-size: 26px; }
 </style>
 </head>
 
 <body>
 
-<h1>🔎 BA Flow Generator (Auto IF-ELSE Branch)</h1>
+<h1>🔎 BA Flow Generator PRO</h1>
+<p>Dán User Story vào đây:</p>
 
-<p>Paste User Story (US) vào đây:</p>
-
-<textarea id="usinput" placeholder="Dán US vào đây..."></textarea>
+<textarea id="usinput"></textarea>
 
 <button onclick="convertUS()">Convert US → Mermaid</button>
 
 <h3>Mermaid Output</h3>
-<textarea id="mermaidoutput" placeholder="Flowchart code sẽ hiển thị ở đây..."></textarea>
+<textarea id="mermaidoutput"></textarea>
 
 <button onclick="renderDiagram()">Vẽ Flow</button>
 
 <div id="diagram"></div>
 
 <script>
-// UTIL: Check keywords for decision
-function isDecision(line) {
+// ================================
+// #1. Insurance Business Keywords
+// ================================
+const insuranceKeywords = {
+    rider: /(rider|kid|kid3|kid9|kid6)/i,
+    ma: /(ma date|ma letter|ma value|đáo hạn)/i,
+    fee: /(phí thiếu|cấn trừ|deduct|payable)/i,
+    status: /(status|IF|PP|LP|MP)/i,
+};
+
+// ================================
+// #2. Node classification
+// ================================
+function classifyNode(line) {
+    let lower = line.toLowerCase();
+    if (/^(input|user)/.test(lower)) return "input";
+    if (/output|result|print|hiển thị/.test(lower)) return "output";
+    if (/if|nếu|when|trường hợp/.test(lower)) return "decision";
+    if (insuranceKeywords.status.test(line)) return "decision"; // domain rule
+    return "process";
+}
+
+function nodeStyle(type) {
+    switch(type) {
+        case "input":    return "([📥 Input])";
+        case "output":   return "([📤 Output])";
+        case "decision": return "{"; // decision diamond
+        default:         return "("; // process
+    }
+}
+
+// ================================
+// #3. Detect IF/ELSE nested
+// ================================
+function isIF(line) {
     return /(if|nếu|when|trường hợp)/i.test(line);
 }
 
-function isElse(line) {
-    return /(else|ngược lại|otherwise|không thì)/i.test(line);
+function isELSE(line) {
+    return /(else|ngược lại|otherwise|không thì|nếu không)/i.test(line);
 }
 
+// ================================
+// #4. MAIN CONVERTER
+// ================================
 function convertUS() {
     let us = document.getElementById("usinput").value;
-    let lines = us.split("\n").map(x => x.trim()).filter(x => x.length > 0);
+    let lines = us.split("\n").map(l => l.trim()).filter(l => l.length > 0);
 
     let nodes = [];
     let edges = [];
 
-    let decisionIndex = null;
+    let stack = [];  // track nested IF
+    let lastNode = null;
 
-    lines.forEach((line, i) => {
-        let id = "N" + (i + 1);
+    lines.forEach((line, idx) => {
+        let id = "N" + (idx + 1);
         let clean = line.replace(/"/g, '');
+        let type = classifyNode(line);
 
-        // Create decision node
-        if (isDecision(line)) {
-            nodes.push(`${id}{"${clean}"}`);  // Decision diamond (Mermaid syntax)
-            decisionIndex = id;
+        // Mermaid format depending on type
+        let nodeDef = "";
+        if (type === "decision") nodeDef = `${id}{${clean}}`;
+        else if (type === "input") nodeDef = `${id}([${clean}])`;
+        else if (type === "output") nodeDef = `${id}([${clean}])`;
+        else nodeDef = `${id}[${clean}]`;
+
+        nodes.push(nodeDef);
+
+        // === CASE 1: IF detected ===
+        if (isIF(line)) {
+            if (lastNode) edges.push(`${lastNode} --> ${id}`);
+            stack.push(id);  // push as current decision root
+            lastNode = id;
+            return;
         }
-        // Create ELSE branch
-        else if (isElse(line)) {
-            nodes.push(`${id}["${clean}"]`);
-            if (decisionIndex) {
-                edges.push(`${decisionIndex} -->|No| ${id}`);
+
+        // === CASE 2: ELSE detected ===
+        if (isELSE(line)) {
+            let parentIF = stack[stack.length - 1];   // last IF
+            edges.push(`${parentIF} -->|No| ${id}`);
+            lastNode = id;
+            return;
+        }
+
+        // === CASE 3: Normal flow logic ===
+        if (stack.length > 0) {
+            let parentIF = stack[stack.length - 1];
+
+            // If this is first "Yes" branch after IF
+            if (lastNode === parentIF) {
+                edges.push(`${parentIF} -->|Yes| ${id}`);
+            } else {
+                edges.push(`${lastNode} --> ${id}`);
             }
+
+            // Closing nested IF if next is independent
+            if (idx + 1 < lines.length && !isELSE(lines[idx+1]) && !isIF(lines[idx+1])) {}
+        } else {
+            if (lastNode) edges.push(`${lastNode} --> ${id}`);
         }
-        // Normal step
-        else {
-            nodes.push(`${id}["${clean}"]`);
-            if (decisionIndex && i > 0 && !isElse(line) && !isDecision(line)) {
-                edges.push(`${decisionIndex} -->|Yes| ${id}`);
-                decisionIndex = null; // reset decision link after branching
-            } else if (i > 0) {
-                edges.push(`N${i} --> ${id}`);
+
+        lastNode = id;
+
+        // auto close IF block if next is END of nested level
+        if (!isELSE(line) && !isIF(line) && stack.length && idx + 1 < lines.length) {
+            if (isIF(lines[idx+1])) {} // next is new IF => nested
+            else if (isELSE(lines[idx+1])) {}
+            else if (!isELSE(lines[idx+1]) && !isIF(lines[idx+1])) {
+                // we are in a YES branch ending
             }
         }
     });
 
-    let mermaid =
-        "flowchart TD\n    " +
-        nodes.join("\n    ") +
-        "\n\n    " +
-        edges.join("\n    ");
+    let code = "flowchart TD\n    " + nodes.join("\n    ") +
+               "\n\n    " + edges.join("\n    ");
 
-    document.getElementById("mermaidoutput").value = mermaid;
+    document.getElementById("mermaidoutput").value = code;
 }
 
+
+// ================================
+// #5. RENDER
+// ================================
 function renderDiagram() {
     let code = document.getElementById("mermaidoutput").value;
     let target = document.getElementById("diagram");
