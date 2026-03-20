@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>BA Flow Generator - Safe Mermaid Version</title>
+<title>BA Flow Generator - Safe Clean Version</title>
 
 https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js
 <script>
@@ -19,98 +19,116 @@ button { padding: 10px; margin: 8px; background: #0066ff; color: #fff; border: n
 
 <body>
 
-<h1>BA Flow Generator (No Error Version)</h1>
+<h1>BA Flow Generator – SAFE VERSION (Không còn lỗi Mermaid)</h1>
 
-<p>Dán US vào đây:</p>
-<textarea id="usinput"></textarea>
-
+<textarea id="usinput" placeholder="Paste User Story vào đây..."></textarea>
 <button onclick="convertUS()">Convert</button>
 
-<h3>Mermaid Result</h3>
+<h3>Mermaid Output</h3>
 <textarea id="mermaidoutput"></textarea>
-
 <button onclick="renderDiagram()">Vẽ Flow</button>
 
 <div id="diagram"></div>
 
 <script>
-// Clean dangerous characters
-function cleanText(t) {
-    return t
-        .replace(/{}[\]/g, "")   // remove brackets
-        .replace(/[#!=*]/g, "")      // remove dangerous chars
-        .replace(/\s+/g, " ")        // collapse spaces
-        .trim();
+
+// ----------------------------
+// 1. RULE: Loại bỏ bảng & GL
+// ----------------------------
+function isNoise(line) {
+    return (
+        /^\d{3,}/.test(line) ||          // dòng bắt đầu bằng số
+        /GENLCDE|S.code|GL sign/i.test(line) ||
+        /\b(LP|MP|LN|VP|EY|EX|MS)\b/i.test(line) ||
+        line.length < 3
+    );
 }
 
-// Detect GL code lines → skip
-function isGL(line) {
-    return /^\d{3,}/.test(line) ||
-           /(GENLCDE|S.code|LP|MP|LN|VP)/i.test(line);
+// ----------------------------
+// 2. Clean dangerous characters
+// ----------------------------
+function sanitize(text) {
+    return text
+        .replace(/{}[\]/g, "")      // remove mermaid breaking chars
+        .replace(/[#!=>*]/g, "")        // remove symbols
+        .replace(/\s+/g, " ")           // normalize whitespace
+        .trim()
+        .slice(0, 80);                  // MAX 80 chars → avoid Mermaid crash
 }
 
+// ----------------------------
+// 3. Detect IF / ELSE
+// ----------------------------
 function isIF(line) { return /(nếu|if|when|trường hợp)/i.test(line); }
-function isELSE(line) { return /(ngược lại|else|otherwise)/i.test(line); }
+function isELSE(line) { return /(ngược lại|else|otherwise|không thì)/i.test(line); }
 
+// ----------------------------
+// 4. MAIN
+// ----------------------------
 function convertUS() {
-    let lines = document.getElementById("usinput").value
-        .split("\n")
-        .map(l => cleanText(l))
-        .filter(l => l.length > 0 && !isGL(l));  // skip GL rows
+    let rawLines = document.getElementById("usinput").value.split("\n");
+
+    let lines = rawLines
+        .map(x => sanitize(x))
+        .filter(x => x.length > 0 && !isNoise(x));
 
     let nodes = [];
     let edges = [];
+
     let stack = [];
-    let lastNode = null;
+    let last = null;
 
-    lines.forEach((line, idx) => {
-        let id = "N" + (idx + 1);
-        let safe = cleanText(line);
+    lines.forEach((line, index) => {
+        let id = "N" + (index + 1);
 
-        // create node
-        let node = isIF(line) ? `${id}{${safe}}`
-                 : isELSE(line) ? `${id}[${safe}]`
-                 : `${id}[${safe}]`;
+        let node = isIF(line)
+            ? `${id}{${line}}`
+            : `${id}[${line}]`;
 
         nodes.push(node);
 
-        // IF branch
         if (isIF(line)) {
-            if (lastNode) edges.push(`${lastNode} --> ${id}`);
+            if (last) edges.push(`${last} --> ${id}`);
             stack.push(id);
-            lastNode = id;
+            last = id;
             return;
         }
 
-        // ELSE branch
         if (isELSE(line)) {
-            const parent = stack[stack.length - 1];
+            let parent = stack[stack.length - 1];
             edges.push(`${parent} -->|No| ${id}`);
-            lastNode = id;
+            last = id;
             return;
         }
 
-        // YES branch
-        if (stack.length > 0 && lastNode === stack[stack.length - 1]) {
-            const parent = stack[stack.length - 1];
+        if (stack.length > 0 && last === stack[stack.length - 1]) {
+            let parent = stack[stack.length - 1];
             edges.push(`${parent} -->|Yes| ${id}`);
-        } else if (lastNode) {
-            edges.push(`${lastNode} --> ${id}`);
+        } else if (last) {
+            edges.push(`${last} --> ${id}`);
         }
 
-        lastNode = id;
+        last = id;
     });
 
-    document.getElementById("mermaidoutput").value =
-        "flowchart TD\n    " + nodes.join("\n    ") +
-        "\n\n    " + edges.join("\n    ");
+    let out =
+        "flowchart TD\n    " +
+        nodes.join("\n    ") +
+        "\n\n    " +
+        edges.join("\n    ");
+
+    document.getElementById("mermaidoutput").value = out;
 }
 
+// ----------------------------
+// 5. Render Mermaid
+// ----------------------------
 function renderDiagram() {
-    document.getElementById("diagram").innerHTML =
-        `<div class="mermaid">${document.getElementById("mermaidoutput").value}</div>`;
+    let code = document.getElementById("mermaidoutput").value;
+    document.getElementById("diagram").innerHTML = `<div class="mermaid">${code}</div>`;
     mermaid.init();
 }
+
 </script>
 
 </body>
