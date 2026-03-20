@@ -1,1 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>BA Diagram Helper</title>
 
+    <!-- Mermaid -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: false, theme: "default" });
+    </script>
+
+    <!-- Style -->
+    <style>
+        body { 
+            font-family: Arial; 
+            margin: 20px;
+            background: #f8f8f8;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            padding: 10px;
+            font-size: 15px;
+        }
+        #diagram {
+            background: white;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>BA Diagram Helper – Vẽ Flowchart / Usecase / Sequence</h1>
+
+<p>Nhập mô tả diagram theo cú pháp Mermaid</p>
+
+<textarea id="input">
+flowchart TD
+    User --> Login
+    Login --> Dashboard
+    Dashboard -->|View report| Report
+</textarea>
+
+<br>
+<button onclick="renderDiagram()">Vẽ Diagram</button>
+
+<div id="diagram"></div>
+
+<script>
+function renderDiagram() {
+    let code = document.getElementById("input").value;
+    let target = document.getElementById("diagram");
+    target.innerHTML = `<div class="mermaid">${code}</div>`;
+    mermaid.init();
+}
+</script>
+
+</body>
+</html>
