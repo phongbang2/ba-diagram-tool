@@ -1,68 +1,105 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <title>BA Diagram Helper</title>
+<meta charset="UTF-8">
+<title>BA Flow Generator (No AI)</title>
 
-    <!-- Mermaid -->
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script>
-        mermaid.initialize({ startOnLoad: false, theme: "default" });
-    </script>
+<!-- Mermaid -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({ startOnLoad: false });
+</script>
 
-    <!-- Style -->
-    <style>
-        body { 
-            font-family: Arial; 
-            margin: 20px;
-            background: #f8f8f8;
-        }
-        textarea {
-            width: 100%;
-            height: 180px;
-            padding: 10px;
-            font-size: 15px;
-        }
-        #diagram {
-            background: white;
-            padding: 20px;
-            margin-top: 20px;
-            border-radius: 8px;
-        }
-        button {
-            padding: 10px 20px;
-            background: #0066ff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            margin-top: 10px;
-        }
-    </style>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f5f5f5;
+}
+textarea {
+    width: 100%;
+    height: 200px;
+    padding: 12px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+button {
+    padding: 10px 18px;
+    margin: 10px 5px 20px 0;
+    background: #0066ff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+#diagram {
+    background: white;
+    padding: 20px;
+    margin-top: 25px;
+    border-radius: 8px;
+}
+</style>
 </head>
+
 <body>
 
-<h1>BA Diagram Helper – Vẽ Flowchart / Usecase / Sequence</h1>
+<h1>🔎 BA Flow Generator (No AI)</h1>
+<p>Paste User Story (US) vào đây:</p>
 
-<p>Nhập mô tả diagram theo cú pháp Mermaid</p>
+<textarea id="usinput" placeholder="Dán US vào đây..."></textarea>
 
-<textarea id="input">
-flowchart TD
-    User --> Login
-    Login --> Dashboard
-    Dashboard -->|View report| Report
-</textarea>
+<button onclick="convertUS()">Convert US → Mermaid</button>
 
-<br>
-<button onclick="renderDiagram()">Vẽ Diagram</button>
+<h3>Mermaid Output</h3>
+<textarea id="mermaidoutput" placeholder="Flowchart code sẽ hiển thị ở đây..."></textarea>
+
+<button onclick="renderDiagram()">Vẽ Flow</button>
 
 <div id="diagram"></div>
 
 <script>
+// Rule-based convert: extract important US logic lines
+function convertUS() {
+    let us = document.getElementById("usinput").value;
+
+    const logic = [
+        "KID", "MA date", "cấn trừ", "release", "rider", "status", "đủ", "thiếu"
+    ];
+
+    const lines = us.split("\n").filter(line =>
+        logic.some(key => line.toLowerCase().includes(key.toLowerCase()))
+    );
+
+    if (lines.length === 0) {
+        alert("Không tìm thấy logic trọng yếu. Bạn hãy thử thêm từ khoá vào.");
+        return;
+    }
+
+    let nodes = [];
+    let edges = [];
+
+    lines.forEach((line, i) => {
+        let id = "N" + (i + 1);
+        let clean = line.replace(/"/g, '').trim();
+        nodes.push(`${id}["${clean}"]`);
+        if (i > 0) edges.push(`N${i} --> ${id}`);
+    });
+
+    let mermaid =
+        "flowchart TD\n    " +
+        nodes.join("\n    ") +
+        "\n\n    " +
+        edges.join("\n    ");
+
+    document.getElementById("mermaidoutput").value = mermaid;
+}
+
 function renderDiagram() {
-    let code = document.getElementById("input").value;
+    let code = document.getElementById("mermaidoutput").value;
     let target = document.getElementById("diagram");
     target.innerHTML = `<div class="mermaid">${code}</div>`;
-    mermaid.init();
+    mermaid.init(undefined, target);
 }
 </script>
 
