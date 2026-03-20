@@ -2,41 +2,27 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>BA Flow Generator (No AI)</title>
+<title>BA Flow Generator (IF/ELSE Auto Branch)</title>
 
 <!-- Mermaid -->
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js
 <script>
     mermaid.initialize({ startOnLoad: false });
 </script>
 
 <style>
-body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
-    background: #f5f5f5;
-}
+body { font-family: Arial; margin: 20px; background: #f5f5f5; }
 textarea {
-    width: 100%;
-    height: 200px;
-    padding: 12px;
-    font-size: 14px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
+    width: 100%; height: 200px; padding: 12px; font-size: 14px;
+    border-radius: 6px; border: 1px solid #ccc;
 }
 button {
-    padding: 10px 18px;
-    margin: 10px 5px 20px 0;
-    background: #0066ff;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
+    padding: 10px 18px; margin: 10px 5px 20px 0;
+    background: #0066ff; color: white; border: none;
+    border-radius: 6px; cursor: pointer;
 }
 #diagram {
-    background: white;
-    padding: 20px;
-    margin-top: 25px;
+    background: white; padding: 20px; margin-top: 25px;
     border-radius: 8px;
 }
 </style>
@@ -44,7 +30,8 @@ button {
 
 <body>
 
-<h1>🔎 BA Flow Generator (No AI)</h1>
+<h1>🔎 BA Flow Generator (Auto IF-ELSE Branch)</h1>
+
 <p>Paste User Story (US) vào đây:</p>
 
 <textarea id="usinput" placeholder="Dán US vào đây..."></textarea>
@@ -59,31 +46,50 @@ button {
 <div id="diagram"></div>
 
 <script>
-// Rule-based convert: extract important US logic lines
+// UTIL: Check keywords for decision
+function isDecision(line) {
+    return /(if|nếu|when|trường hợp)/i.test(line);
+}
+
+function isElse(line) {
+    return /(else|ngược lại|otherwise|không thì)/i.test(line);
+}
+
 function convertUS() {
     let us = document.getElementById("usinput").value;
-
-    const logic = [
-        "KID", "MA date", "cấn trừ", "release", "rider", "status", "đủ", "thiếu"
-    ];
-
-    const lines = us.split("\n").filter(line =>
-        logic.some(key => line.toLowerCase().includes(key.toLowerCase()))
-    );
-
-    if (lines.length === 0) {
-        alert("Không tìm thấy logic trọng yếu. Bạn hãy thử thêm từ khoá vào.");
-        return;
-    }
+    let lines = us.split("\n").map(x => x.trim()).filter(x => x.length > 0);
 
     let nodes = [];
     let edges = [];
 
+    let decisionIndex = null;
+
     lines.forEach((line, i) => {
         let id = "N" + (i + 1);
-        let clean = line.replace(/"/g, '').trim();
-        nodes.push(`${id}["${clean}"]`);
-        if (i > 0) edges.push(`N${i} --> ${id}`);
+        let clean = line.replace(/"/g, '');
+
+        // Create decision node
+        if (isDecision(line)) {
+            nodes.push(`${id}{"${clean}"}`);  // Decision diamond (Mermaid syntax)
+            decisionIndex = id;
+        }
+        // Create ELSE branch
+        else if (isElse(line)) {
+            nodes.push(`${id}["${clean}"]`);
+            if (decisionIndex) {
+                edges.push(`${decisionIndex} -->|No| ${id}`);
+            }
+        }
+        // Normal step
+        else {
+            nodes.push(`${id}["${clean}"]`);
+            if (decisionIndex && i > 0 && !isElse(line) && !isDecision(line)) {
+                edges.push(`${decisionIndex} -->|Yes| ${id}`);
+                decisionIndex = null; // reset decision link after branching
+            } else if (i > 0) {
+                edges.push(`N${i} --> ${id}`);
+            }
+        }
     });
 
     let mermaid =
